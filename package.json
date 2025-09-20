@@ -46,7 +46,8 @@
     "react-native-screens": "~4.10.0",
     "react-native-svg": "15.11.2",
     "react-native-web": "^0.20.0",
-    "zustand": "^5.0.2"
+    "zustand": "^5.0.2",
+    "ajv": "^8.17.1"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
