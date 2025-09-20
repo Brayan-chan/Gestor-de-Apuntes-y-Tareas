@@ -1,98 +1,236 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { useNotes } from '@/hooks/useNotesStore';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import NoteCard from '@/components/NoteCard';
+import Colors from '@/constants/colors';
+import { router } from 'expo-router';
+import { Plus, Search } from 'lucide-react-native';
+import React, { useState, useMemo } from 'react';
+import {
+  FlatList,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+} from 'react-native';
 
-export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
+export default function NotesScreen() {
+  const { notes, subjects, updateNote } = useNotes();
+  const insets = useSafeAreaInsets();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'completed' | 'urgent'>('all');
+
+
+  const filteredNotes = useMemo(() => {
+    let filtered = notes;
+
+    // Filter by search query
+    if (searchQuery) {
+      filtered = filtered.filter(note =>
+        note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        note.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        note.className?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    // Filter by status
+    if (filterStatus !== 'all') {
+      filtered = filtered.filter(note => note.status === filterStatus);
+    }
+
+    // Sort by date (newest first)
+    return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [notes, searchQuery, filterStatus]);
+
+
+
+  const toggleNoteStatus = async (noteId: string) => {
+    const note = notes.find(n => n.id === noteId);
+    if (note) {
+      const newStatus = note.status === 'completed' ? 'pending' : 'completed';
+      await updateNote(noteId, { status: newStatus });
+    }
+  };
+
+  const getSubjectForNote = (subjectId: string) => {
+    return subjects.find(s => s.id === subjectId);
+  };
+
+  const renderNote = ({ item }: { item: typeof notes[0] }) => (
+    <NoteCard
+      note={item}
+      subject={getSubjectForNote(item.subjectId)}
+      onPress={() => router.push(`/note/${item.id}`)}
+      onToggleStatus={() => toggleNoteStatus(item.id)}
+    />
+  );
+
+  const renderHeader = () => (
+    <View style={styles.header}>
+      <Text style={styles.title}>Mis Apuntes</Text>
+      
+      <View style={styles.searchContainer}>
+        <Search size={20} color={Colors.light.gray} style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Buscar apuntes..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholderTextColor={Colors.light.gray}
         />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+      </View>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+      <View style={styles.filterContainer}>
+        {(['all', 'pending', 'completed', 'urgent'] as const).map((status) => (
+          <TouchableOpacity
+            key={status}
+            style={[
+              styles.filterButton,
+              filterStatus === status && styles.filterButtonActive
+            ]}
+            onPress={() => setFilterStatus(status)}
+          >
+            <Text style={[
+              styles.filterText,
+              filterStatus === status && styles.filterTextActive
+            ]}>
+              {status === 'all' ? 'Todos' : 
+               status === 'pending' ? 'Pendientes' :
+               status === 'completed' ? 'Completados' : 'Urgentes'}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  );
+
+  const renderEmpty = () => (
+    <View style={styles.emptyContainer}>
+      <Text style={styles.emptyTitle}>No hay apuntes</Text>
+      <Text style={styles.emptyText}>
+        {searchQuery || filterStatus !== 'all' 
+          ? 'No se encontraron apuntes con los filtros aplicados'
+          : 'Comienza creando tu primer apunte'
+        }
+      </Text>
+    </View>
+  );
+
+  return (
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <FlatList
+        data={filteredNotes}
+        renderItem={renderNote}
+        keyExtractor={(item) => item.id}
+        ListHeaderComponent={renderHeader}
+        ListEmptyComponent={renderEmpty}
+
+        contentContainerStyle={filteredNotes.length === 0 ? styles.emptyList : undefined}
+        showsVerticalScrollIndicator={false}
+      />
+
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => router.push('/note/new')}
+      >
+        <Plus size={24} color="white" />
+      </TouchableOpacity>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    flex: 1,
+    backgroundColor: Colors.light.secondary,
   },
-  stepContainer: {
-    gap: 8,
+  header: {
+    backgroundColor: 'white',
+    paddingTop: 20,
+    paddingBottom: 16,
+    paddingHorizontal: 16,
     marginBottom: 8,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: Colors.light.text,
+    marginBottom: 16,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.light.secondary,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    marginBottom: 16,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    height: 44,
+    fontSize: 16,
+    color: Colors.light.text,
+  },
+  filterContainer: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  filterButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: Colors.light.secondary,
+  },
+  filterButtonActive: {
+    backgroundColor: Colors.light.tint,
+  },
+  filterText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: Colors.light.gray,
+  },
+  filterTextActive: {
+    color: 'white',
+  },
+  emptyList: {
+    flexGrow: 1,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: Colors.light.text,
+    marginBottom: 8,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: Colors.light.gray,
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  fab: {
     position: 'absolute',
+    right: 20,
+    bottom: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Colors.light.tint,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
 });
